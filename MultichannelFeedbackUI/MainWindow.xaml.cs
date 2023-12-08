@@ -60,7 +60,6 @@ namespace MultichannelFeedbackUI
 
                     uint val = (propValue == null) ? 0 : (uint)propValue.Value;
 
-                    // Set _window.LabelStatusText to the appropriate string or ChannelStatus[0] if the property value is null
                     string text = $"({val}) {ChannelStatus[val]}";
 
                     PropertyValueChanged?.Invoke(text);
