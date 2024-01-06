@@ -82,7 +82,6 @@ namespace MultichannelFeedbackUI
                     return;
                 }
 
-                // Set _window.LabelStatusText to the appropriate string or ChannelStatus[0] if the property value is null
                 string text = $"Content: ({_ContentMaxChannelCount}) {ChannelStatus[_ContentMaxChannelCount]}\nProcessing: ({_ProcessingChannelCount}) {ChannelStatus[_ProcessingChannelCount]}";
 
                 PropertyValueChanged?.Invoke(text);
