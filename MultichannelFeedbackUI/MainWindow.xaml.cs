@@ -22,11 +22,16 @@ namespace MultichannelFeedbackUI
         private class ChannelCountChangeHandler
             : IMMNotificationClient
         {
-            internal static readonly PropertyKey _PKEY_THX_Content_MaxChannelCount = new PropertyKey(new Guid("D5E8F0AB-4DE6-4D91-AB21-68868DDA6A4A"), 11);
+            private static readonly Guid PKEY_THX_fmtid = new Guid("D5E8F0AB-4DE6-4D91-AB21-68868DDA6A4A");
+            internal static readonly PropertyKey _PKEY_THX_Content_MaxChannelCount = new PropertyKey(PKEY_THX_fmtid, 11);
+            internal static readonly PropertyKey _PKEY_THX_ProcessingChannelCount = new PropertyKey(PKEY_THX_fmtid, 12);
 
             private readonly string _deviceId;
 
             public event Action<string>? PropertyValueChanged;
+
+            private uint _ContentMaxChannelCount = 0;
+            private uint _ProcessingChannelCount = 0;
 
             public ChannelCountChangeHandler(MMDevice device)
             {
@@ -51,20 +56,36 @@ namespace MultichannelFeedbackUI
 
             public void OnPropertyValueChanged(string pwstrDeviceId, PropertyKey key)
             {
-                if ((pwstrDeviceId == _deviceId) && key.Equals(_PKEY_THX_Content_MaxChannelCount))
+                if (pwstrDeviceId != _deviceId)
                 {
-                    MMDevice device = new MMDeviceEnumerator().GetDevice(_deviceId);
-
-                    // Retrieve the PKEY_THX_Content_MaxChannelCount property
-                    var propValue = device.Properties[key];
-
-                    uint val = (propValue == null) ? 0 : (uint)propValue.Value;
-
-                    // Set _window.LabelStatusText to the appropriate string or ChannelStatus[0] if the property value is null
-                    string text = $"({val}) {ChannelStatus[val]}";
-
-                    PropertyValueChanged?.Invoke(text);
+                    return;
                 }
+
+
+                MMDevice device = new MMDeviceEnumerator().GetDevice(_deviceId);
+
+                // Retrieve the PKEY_THX_Content_MaxChannelCount property
+                var propValue = device.Properties[key];
+
+                uint val = (propValue == null) ? 0 : (uint)propValue.Value;
+
+                if (_PKEY_THX_Content_MaxChannelCount.Equals(key))
+                {
+                    _ContentMaxChannelCount = (uint)device.Properties[key].Value;
+                }
+                else if (_PKEY_THX_ProcessingChannelCount.Equals(key))
+                {
+                    _ProcessingChannelCount = (uint)device.Properties[key].Value;
+                }
+                else
+                {
+                    return;
+                }
+
+                // Set _window.LabelStatusText to the appropriate string or ChannelStatus[0] if the property value is null
+                string text = $"Content: ({_ContentMaxChannelCount}) {ChannelStatus[_ContentMaxChannelCount]}\nProcessing: ({_ProcessingChannelCount}) {ChannelStatus[_ProcessingChannelCount]}";
+
+                PropertyValueChanged?.Invoke(text);
             }
         }
 
@@ -116,8 +137,11 @@ namespace MultichannelFeedbackUI
             {
                 _enumerator.UnregisterEndpointNotificationCallback(_notificationClient);
             }
+
             MMDevice selectedDevice = (MMDevice)RenderEndpointSelector.SelectedItem;
+            
             _notificationClient = new ChannelCountChangeHandler(selectedDevice);
+            
             _notificationClient.PropertyValueChanged += (text) =>
             {
                 Dispatcher.Invoke(() =>
@@ -125,8 +149,12 @@ namespace MultichannelFeedbackUI
                     ((ViewModel)this.DataContext).StatusTextLabel = text;
                 });
             };
+            
             _notificationClient.OnPropertyValueChanged(selectedDevice.ID,
                 ChannelCountChangeHandler._PKEY_THX_Content_MaxChannelCount);
+            _notificationClient.OnPropertyValueChanged(selectedDevice.ID,
+                ChannelCountChangeHandler._PKEY_THX_ProcessingChannelCount);
+
             _enumerator.RegisterEndpointNotificationCallback(_notificationClient);
         }
     }
