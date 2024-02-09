@@ -20,7 +20,11 @@
         <StackPanel>
             <StackPanel>
                 <ComboBox x:Name="RenderEndpointSelector" 
-                          SelectionChanged="RenderEndpointSelector_SelectionChanged"/>
+                          SelectionChanged="RenderEndpointSelector_SelectionChanged"
+                          ItemsSource="{Binding Devices}"
+                          DisplayMemberPath="FriendlyName"
+                          SelectedValue="{Binding SelectedDeviceId, Mode=TwoWay}"
+                          SelectedValuePath="ID"/>
             </StackPanel>
             <StackPanel>
                 <Label x:Name="StatusText" Content="{Binding StatusTextLabel}" 

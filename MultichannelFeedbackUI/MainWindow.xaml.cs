@@ -1,5 +1,6 @@
 ﻿using NAudio.CoreAudioApi;
 using NAudio.CoreAudioApi.Interfaces;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Text;
 using System.Windows;
@@ -19,6 +20,12 @@ namespace MultichannelFeedbackUI
     /// </summary>
     public partial class MainWindow : Window
     {
+        static private string FormatChannelCountMessage(uint contentMaxChannelCount, uint processingChannelCount)
+        {
+            string text = $"Content: ({contentMaxChannelCount}) {ChannelStatus[contentMaxChannelCount]}\nProcessing: ({processingChannelCount}) {ChannelStatus[processingChannelCount]}";
+            return text;
+        }
+
         private class ChannelCountChangeHandler
             : IMMNotificationClient
         {
@@ -61,7 +68,6 @@ namespace MultichannelFeedbackUI
                     return;
                 }
 
-
                 MMDevice device = new MMDeviceEnumerator().GetDevice(_deviceId);
 
                 // Retrieve the PKEY_THX_Content_MaxChannelCount property
@@ -71,20 +77,54 @@ namespace MultichannelFeedbackUI
 
                 if (_PKEY_THX_Content_MaxChannelCount.Equals(key))
                 {
-                    _ContentMaxChannelCount = (uint)device.Properties[key].Value;
+                    // Check the device.Properties[key]. Use 0 if null and .Value otherwise
+                    _ContentMaxChannelCount = (uint)(device.Properties[key]?.Value ?? 0U);
                 }
                 else if (_PKEY_THX_ProcessingChannelCount.Equals(key))
                 {
-                    _ProcessingChannelCount = (uint)device.Properties[key].Value;
+                    _ProcessingChannelCount = (uint)(device.Properties[key]?.Value ?? 0U);
                 }
                 else
                 {
                     return;
                 }
 
-                string text = $"Content: ({_ContentMaxChannelCount}) {ChannelStatus[_ContentMaxChannelCount]}\nProcessing: ({_ProcessingChannelCount}) {ChannelStatus[_ProcessingChannelCount]}";
 
-                PropertyValueChanged?.Invoke(text);
+                PropertyValueChanged?.Invoke(FormatChannelCountMessage(_ContentMaxChannelCount, _ProcessingChannelCount));
+            }
+        }
+
+        private class DeviceListener
+            : IMMNotificationClient
+        {
+            public event Action<string, DeviceState>? ReloadDevicesList;
+
+            private MMDeviceEnumerator _enmumerator = new MMDeviceEnumerator();
+
+            public void OnDeviceStateChanged(string deviceId, DeviceState newState)
+            {
+                MMDevice device = _enmumerator.GetDevice(deviceId);
+                if (device.DataFlow != DataFlow.Render)
+                {
+                    return;
+                }
+                ReloadDevicesList?.Invoke(deviceId, newState);
+            }
+
+            public void OnDeviceAdded(string pwstrDeviceId)
+            {
+            }
+
+            public void OnDeviceRemoved(string deviceId)
+            {
+            }
+
+            public void OnDefaultDeviceChanged(DataFlow flow, Role role, string defaultDeviceId)
+            {
+            }
+
+            public void OnPropertyValueChanged(string pwstrDeviceId, PropertyKey key)
+            {
             }
         }
 
@@ -102,6 +142,20 @@ namespace MultichannelFeedbackUI
                 }
             }
 
+            public ObservableCollection<MMDevice> Devices { get; set; } = new ObservableCollection<MMDevice>();
+
+            private string _selectedDeviceId = "";
+
+            public string SelectedDeviceId
+            {
+                get => _selectedDeviceId;
+                set
+                {
+                    _selectedDeviceId = value;
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedDeviceId)));
+                }
+            }
+
             public event PropertyChangedEventHandler? PropertyChanged;
         }
 
@@ -109,8 +163,10 @@ namespace MultichannelFeedbackUI
 
         private ChannelCountChangeHandler? _notificationClient;
 
+        private readonly DeviceListener _deviceListener = new DeviceListener();
+
         private static string[] ChannelStatus =
-        [
+        {
             "No channel information available",
             "Mono",
             "Stereo",
@@ -120,14 +176,46 @@ namespace MultichannelFeedbackUI
             "5.1",
             "7.0",
             "7.1"
-        ];
+        };
 
         public MainWindow()
         {
             InitializeComponent();
-            this.DataContext = new ViewModel();
+            ViewModel vm = new ViewModel();
+            this.DataContext = vm;
+
             var devices = _enumerator.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active);
-            RenderEndpointSelector.ItemsSource = devices;
+            vm.Devices = new ObservableCollection<MMDevice>(devices);
+            _deviceListener.ReloadDevicesList += (string deviceId, DeviceState newState) =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    if (newState == DeviceState.Active)
+                    {
+                        MMDevice device = _enumerator.GetDevice(deviceId);
+                        if (vm.Devices.FirstOrDefault(d => d.ID.Equals(deviceId), null) == null)
+                        {
+                            vm.Devices.Add(device);
+                        }
+                    }
+#if false
+                    else
+                    {
+                        if (deviceId.Equals(vm.SelectedDeviceId))
+                        {
+                            vm.SelectedDeviceId = null;
+                        }
+
+                        MMDevice? device = vm.Devices.FirstOrDefault(d => d.ID == deviceId);
+                        if (device != null)
+                        {
+                            _ = vm.Devices.Remove(device);
+                        }
+                    }
+#endif
+                });
+            };
+            _enumerator.RegisterEndpointNotificationCallback(_deviceListener);
         }
 
         private void RenderEndpointSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -138,9 +226,9 @@ namespace MultichannelFeedbackUI
             }
 
             MMDevice selectedDevice = (MMDevice)RenderEndpointSelector.SelectedItem;
-            
+
             _notificationClient = new ChannelCountChangeHandler(selectedDevice);
-            
+
             _notificationClient.PropertyValueChanged += (text) =>
             {
                 Dispatcher.Invoke(() =>
@@ -148,7 +236,7 @@ namespace MultichannelFeedbackUI
                     ((ViewModel)this.DataContext).StatusTextLabel = text;
                 });
             };
-            
+
             _notificationClient.OnPropertyValueChanged(selectedDevice.ID,
                 ChannelCountChangeHandler._PKEY_THX_Content_MaxChannelCount);
             _notificationClient.OnPropertyValueChanged(selectedDevice.ID,
