@@ -1,4 +1,82 @@
+<<<<<<< HEAD
 *.user
 **/bin/
 **/obj/
 **/.vs/
+=======
+# Visual Studio / .NET
+.vs/
+*.suo
+*.user
+*.userosscache
+*.VC.db
+*.VC.opendb
+*.pdb
+*.mdb
+*.opendb
+*.cache
+*.ilk
+*.log
+
+# Build artifacts
+[Bb]in/
+[Oo]bj/
+Debug/
+Release/
+TestResults/
+artifacts/
+
+# Rider and ReSharper
+.idea/
+_ReSharper*/
+*.DotSettings.user
+
+# Visual Studio Code
+.vscode/
+
+# NuGet
+*.nupkg
+packages/
+project.lock.json
+project.fragment.lock.json
+
+# Publish output
+publish/
+*.Publish.xml
+
+# ASP.NET Scaffolding
+ScaffoldingReadMe.txt
+
+# Azure Web Apps
+*.azurePubxml
+
+# Entity Framework
+*.edmx.diagram
+
+# User-specific files
+*.sln.docstates
+*.userprefs
+
+# MonoDevelop
+*.userprefs
+
+# Test and coverage
+*.coverage
+*.coveragexml
+coverage/
+coverage.*
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+.DS_Store
+
+# Others
+*.vspscc
+*.vssscc
+
+# Keep node deps out if any
+node_modules/
+
+# End of .gitignore
+>>>>>>> 7758749 (.gitignore)
